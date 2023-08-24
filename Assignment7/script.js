@@ -1,80 +1,144 @@
-let exportedData = [];
-let countryData = [];
+let countryData = []; // Global variable to store country data
+let exportData = []; // Global variable to store export data
 
 // Function to fetch and store country data
 async function fetchCountryData() {
+
     try {
-        const response = await fetch('https://restcountries.com/v3.1/all');
+
+        const response = await fetch("https://restcountries.com/v3.1/all");
         countryData = await response.json();
     } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error("Error fetching data:", error);
     }
 }
+
 // Call the function to fetch and store country data
 
 fetchCountryData();
-const searchForm = document.getElementById('search-form');
-const searchInput = document.getElementById('search-input');
-const searchOption = document.getElementById('searchoption');
-const countryContainer = document.getElementById('country-container');
+const searchForm = document.getElementById("search-form");
+const searchInput = document.getElementById("search-input");
+const searchOption = document.getElementById("searchoption");
+const countryContainer = document.getElementById("country-container");
+const exportButton = document.getElementById("export-json");
 
-searchForm.addEventListener('submit', (e) => {
+searchForm.addEventListener("submit", (e) => {
     e.preventDefault();
-
     const searchTerm = searchInput.value.trim().toLowerCase();
     const searchType = searchOption.value;
-    if (searchTerm === '') {
+    if (searchTerm === "") {
         return;
     }
-    countryContainer.innerHTML = '';
-    countryData.forEach(country => {
-        if (searchType === 'name' && country.name.common.toLowerCase().includes(searchTerm)) {
-         displayCountryCard(country);
-        } else if (searchType === 'currency' && country.currencies && country.currencies[0].toLowerCase().includes(searchTerm)) {
+    countryContainer.innerHTML = "";
+    exportData = []; // Clear previous export data
+    let foundCountry = false;
+    countryData.forEach((country) => {
+       if (
+           (searchType === "name" 
+           && country.name && country.name.common.toLowerCase().includes(searchTerm)) || 
+           (searchType === "currency" && checkCurrency(country.currencies, searchTerm))
 
+        ) {
             displayCountryCard(country);
-
+            exportData.push({
+                img: country.flags.png,
+                name: country.name.common,
+                capital: country.capital,
+                population: country.population,
+            });
+            foundCountry = true;
         }
-
     });
-
+    if (!foundCountry) {
+       displayErrorMessage("Country not found");
+    }
+  // Toggle the visibility of the export button based on data availability
+    exportButton.hidden = !foundCountry;
 });
 
-// Function to display a country card
+exportButton.addEventListener("click", () => {
+    downloadJSON(exportData);
+});
+
+// function checkCapital(capital,searchTerm){
+//     if(!capital){
+//         return false;
+//     }
+//     else{
+//         return displayCountryCard(country);
+//     }
+
+// }
+
+function checkCurrency(currencies, searchTerm) {
+    if (!currencies) {
+        return false;
+    }
+    const currencyKeys = Object.keys(currencies);
+    const lastCurrency = currencyKeys[currencyKeys.length - 1];
+    return lastCurrency.toLowerCase() === searchTerm;
+}
 
 function displayCountryCard(country) {
-    const countryCard = document.createElement('div');
-    countryCard.classList.add('country-card');
+
+    const countryCard = document.createElement("div");
+
+    countryCard.classList.add("country-card");
     countryCard.innerHTML = `
-        <img src="${country.flags.png}" alt="${country.name.common}">
-        <h2>${country.name.common}</h2>
-        <p>Capital: ${country.capital}</p>
-        <p>Population: ${country.population}</p>
-    `;
-    exportedData.push({
-        name: country.name.common,
-        capital: country.capital,
-        population: country.population,
-        img:country.flags.png
-    });
-    countryContainer.appendChild(countryCard);
+    <img class="img" src="${country.flags.png}" alt="${country.name.common}">
+    <h2 class="head">${country.name.common}</h2>
+    <p class="text">Capital: ${country.capital}</p>
+   <p class="text">Population: ${country.population}</p>
+   <p class="text">Currency: ${Object.keys(country.currencies)[0]}</p>
+   
+  `;
+  countryContainer.appendChild(countryCard);
+
 }
-// Export button click event listener
+function displayErrorMessage(message) {
+  const errorMessage = document.createElement("p");
+  errorMessage.classList.add("error-message");
+  errorMessage.textContent = message;
+  countryContainer.appendChild(errorMessage);
+}
 
-const exportButton = document.getElementById('export-button');
-exportButton.addEventListener('click', () => {
-    exportData();
-});
-// Function to export data as JSON file
-function exportData() {
-    const dataStr = JSON.stringify(exportedData, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+function downloadJSON(data) {
 
-    a.href = url;
-    a.download = 'exported_data.json';
-    a.click();
-    URL.revokeObjectURL(url);
+  const countryCards = Array.from(
+    countryContainer.querySelectorAll(".country-card")
 
+  );
+
+
+  if (countryCards.length > 0) {
+    const jsonData = countryCards.map((countryCard) => {
+      return {
+        type: countryCard.tagName.toLocaleLowerCase(),
+        class: countryCard.className,
+        children: Array.from(countryCard.children).map((childElement) => {
+         const childData = {
+            type: childElement.tagName.toLowerCase(),
+            class: childElement.className,
+          };
+          if (childElement.tagName.toLowerCase() === "img") {
+            childData.src = childElement.getAttribute("src");
+          } else {
+            childData.text = childElement.textContent;
+
+          }
+        return childData;
+        }),
+      };
+
+    });
+    const formatjsonData = JSON.stringify([jsonData], null, 2);
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(formatjsonData);
+
+
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", "country_data.json");
+    downloadAnchor.click();
+
+  }
 }
